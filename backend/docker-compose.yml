@@ -1,20 +1,93 @@
 services:
-  db:
-    image: pgvector/pgvector:pg13
+  # Backend service
+  intric-backend:
+    container_name: intric-backend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    networks:
+      - intric
     ports:
-      - 5432:5432
+      - 8123:8123 # Expose port 8123
     env_file:
-      - ./.env
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./.env # Environment variables file
+    environment:
+      - POSTGRES_HOST=intric-db # Database host
+      - REDIS_HOST=intric-redis # Redis host
+    depends_on:
+      intric-db:
+        condition: service_healthy # Wait for the database to be healthy
+      intric-redis:
+        condition: service_started # Wait for Redis to start
+    healthcheck: # Healthcheck for the backend service
+      test: ["CMD", "curl", "-f", "http://localhost:8123/health"] # Healthcheck endpoint can be found in backend/src/instorage/server/main.py
+      interval: 10s # Time between health checks
+      timeout: 5s # Time to wait for a health check to succeed
+      retries: 3 # Number of retries before considering the service unhealthy
+      start_period: 20s # Start period before starting health checks
 
-  redis:
-    image: redis
+  # Worker service
+  intric-worker:
+    container_name: intric-worker
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    networks:
+      - intric
+    command: poetry run arq src.instorage.worker.worker.WorkerSettings # Command to run the worker
+    depends_on:
+      intric-backend:
+        condition: service_healthy # Wait for the backend to be healthy
+
+  # Frontend service
+  intric-frontend:
+    container_name: intric-frontend
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    networks:
+      - intric
     ports:
-      - 6379:6379
+      - 3000:3000 # Expose port 3000
+    depends_on:
+      intric-worker:
+        condition: service_started # Wait for the worker to start
+
+  # Database service
+  intric-db:
+    container_name: intric-db
+    image: pgvector/pgvector:pg13 # Database image
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres # Database username
+      - POSTGRES_PASSWORD=postgres # Database password
+      - POSTGRES_DB=postgres # Database name
+    networks:
+      - intric
     volumes:
-      - redis_data:/data
+      - postgres_data:/var/lib/postgresql/data # Volume for database data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"] # Healthcheck command for the database
+      interval: 5s # Time between health checks
+      timeout: 5s # Time to wait for a health check to succeed
+      retries: 5 # Number of retries before considering the service unhealthy
+
+  # Redis service
+  intric-redis:
+    container_name: intric-redis
+    image: redis # Redis image
+    networks:
+      - intric
+    volumes:
+      - redis_data:/data # Volume for Redis data
 
 volumes:
-  postgres_data:
-  redis_data:
+  postgres_data: # Volume for database data
+  redis_data: # Volume for Redis data
+
+networks:
+  intric:
+    name: intric # Custom network name
