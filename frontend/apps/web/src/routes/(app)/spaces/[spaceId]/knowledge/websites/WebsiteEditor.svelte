@@ -80,7 +80,11 @@
 
   const updateOptions = [
     { label: "Never", value: "never" },
-    { label: "Every week", value: "weekly" }
+    { label: "Daily", value: "daily" },
+    { label: "Every 3 days", value: "every_3_days" },
+    { label: "Weekly", value: "weekly" },
+    { label: "Every 2 weeks", value: "every_2_weeks" },
+    { label: "Monthly", value: "monthly" }
   ] as { label: string; value: Website["update_interval"] }[];
 </script>
 

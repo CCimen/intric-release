@@ -7,16 +7,17 @@ from intric.main.logging import get_logger
 from intric.websites.crawl_dependencies.crawl_models import (
     CrawlTask,
 )
+from intric.websites.domain.website import UpdateInterval
 
 logger = get_logger(__name__)
 
 
-async def queue_website_crawls(container: Container):
+async def queue_website_crawls(container: Container, interval: UpdateInterval = UpdateInterval.WEEKLY):
     user_repo = container.user_repo()
     website_sparse_repo = container.website_sparse_repo()
 
     async with container.session().begin():
-        websites = await website_sparse_repo.get_weekly_websites()
+        websites = await website_sparse_repo.get_websites_by_interval(interval)
 
         for website in websites:
             try:

@@ -16,7 +16,11 @@ if TYPE_CHECKING:
 
 class UpdateInterval(str, Enum):
     NEVER = "never"
+    DAILY = "daily"
+    EVERY_3_DAYS = "every_3_days"
     WEEKLY = "weekly"
+    EVERY_2_WEEKS = "every_2_weeks"
+    MONTHLY = "monthly"
 
 
 class Website(Entity):
