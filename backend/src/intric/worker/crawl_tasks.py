@@ -68,6 +68,8 @@ async def crawl_task(*, job_id: UUID, params: CrawlTask, container: Container):
             url=params.url,
             download_files=params.download_files,
             crawl_type=params.crawl_type,
+            http_user=params.http_user,
+            http_pass=params.http_pass,
         ) as crawl:
             for page in crawl.pages:
                 num_pages += 1

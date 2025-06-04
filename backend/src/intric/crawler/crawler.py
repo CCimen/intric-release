@@ -47,19 +47,28 @@ class Crawler:
     def _run_crawl(
         url: str,
         download_files: bool = False,
+        http_user: str = None,
+        http_pass: str = None,
         *,
         filepath: Path,
         files_dir: Optional[Path],
     ):
         files_dir = files_dir if download_files else None
         runner = create_runner(filepath=filepath, files_dir=files_dir)
-        return runner.crawl(CrawlSpider, url=url)
+        return runner.crawl(CrawlSpider, url=url, http_user=http_user, http_pass=http_pass)
 
     @crochet.wait_for(SETTINGS.crawl_max_length)
     @staticmethod
-    def _run_sitemap_crawl(sitemap_url: str, *, filepath: Path, files_dir: Optional[Path]):
+    def _run_sitemap_crawl(
+        sitemap_url: str, 
+        http_user: str = None, 
+        http_pass: str = None, 
+        *, 
+        filepath: Path, 
+        files_dir: Optional[Path]
+    ):
         runner = create_runner(filepath=filepath)
-        return runner.crawl(SitemapSpider, sitemap_url=sitemap_url)
+        return runner.crawl(SitemapSpider, sitemap_url=sitemap_url, http_user=http_user, http_pass=http_pass)
 
     @asynccontextmanager
     async def _crawl(self, func, **kwargs):
@@ -70,7 +79,11 @@ class Crawler:
                 # If the result file is empty
                 # (This will fail if the expected result is no pages but some files)
                 if os.stat(tmp_file.name).st_size == 0:
-                    raise CrawlerException("Crawl failed")
+                    raise CrawlerException(
+                        "Crawl failed: No content was extracted. This may be due to: "
+                        "1) Authentication failure, 2) No parseable HTML content, "
+                        "3) Website blocking crawlers, or 4) Network issues."
+                    )
 
                 def _iter_pages():
                     with open(tmp_file.name) as f:
@@ -90,17 +103,26 @@ class Crawler:
         url: str,
         download_files: bool = False,
         crawl_type: CrawlType = CrawlType.CRAWL,
+        http_user: str = None,
+        http_pass: str = None,
     ):
         if crawl_type == CrawlType.CRAWL:
             async with self._crawl(
                 self._run_crawl,
                 url=url,
                 download_files=download_files,
+                http_user=http_user,
+                http_pass=http_pass,
             ) as crawl_result:
                 yield crawl_result
 
         elif crawl_type == CrawlType.SITEMAP:
-            async with self._crawl(self._run_sitemap_crawl, sitemap_url=url) as crawl_result:
+            async with self._crawl(
+                self._run_sitemap_crawl, 
+                sitemap_url=url,
+                http_user=http_user,
+                http_pass=http_pass,
+            ) as crawl_result:
                 yield crawl_result
 
         else:

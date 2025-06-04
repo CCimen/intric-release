@@ -5545,6 +5545,15 @@ export interface components {
       /** @default never */
       update_interval?: components["schemas"]["UpdateInterval"];
       embedding_model?: components["schemas"]["ModelId"] | null;
+      /**
+       * Requires Auth
+       * @default false
+       */
+      requires_auth?: boolean;
+      /** Auth Username */
+      auth_username?: string | null;
+      /** Auth Password */
+      auth_password?: string | null;
     };
     /** WebsiteCreateRequestDeprecated */
     WebsiteCreateRequestDeprecated: {
@@ -5566,6 +5575,13 @@ export interface components {
       crawl_type?: components["schemas"]["CrawlType"];
       /** @default never */
       update_interval?: components["schemas"]["UpdateInterval"];
+      /**
+       * Requires Auth
+       * @default false
+       */
+      requires_auth?: boolean;
+      /** Auth Username */
+      auth_username?: string | null;
       embedding_model: components["schemas"]["ModelId"];
     };
     /** WebsiteMetadata */
@@ -5607,6 +5623,13 @@ export interface components {
         | null;
       embedding_model: components["schemas"]["EmbeddingModelPublic"];
       metadata: components["schemas"]["WebsiteMetadata"];
+      /**
+       * Requires Auth
+       * @default false
+       */
+      requires_auth?: boolean;
+      /** Auth Username */
+      auth_username?: string | null;
     };
     /** WebsiteUpdate */
     WebsiteUpdate: {
@@ -5635,6 +5658,21 @@ export interface components {
        * @default NOT_PROVIDED
        */
       update_interval?: components["schemas"]["UpdateInterval"];
+      /**
+       * Requires Auth
+       * @default NOT_PROVIDED
+       */
+      requires_auth?: boolean;
+      /**
+       * Auth Username
+       * @default NOT_PROVIDED
+       */
+      auth_username?: string | null;
+      /**
+       * Auth Password
+       * @default NOT_PROVIDED
+       */
+      auth_password?: string | null;
     };
     /**
      * WizardType

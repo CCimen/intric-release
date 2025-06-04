@@ -14,6 +14,8 @@ class CrawlSpider(scrapy.spiders.CrawlSpider):
     def __init__(
         self,
         url: str,
+        http_user: str = None,
+        http_pass: str = None,
         *args,
         **kwargs,
     ):
@@ -21,6 +23,12 @@ class CrawlSpider(scrapy.spiders.CrawlSpider):
 
         self.allowed_domains = [parsed_uri.netloc]
         self.start_urls = [url]
+        
+        # Set up basic authentication if provided
+        if http_user and http_pass:
+            self.http_user = http_user
+            self.http_pass = http_pass
+            self.http_auth_domain = parsed_uri.netloc
 
         self.rules = [
             Rule(
