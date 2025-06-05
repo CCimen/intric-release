@@ -21,3 +21,6 @@ docker-compose.yml
 
 # venv
 .venv/
+CLAUDE.md
+BASIC_AUTH_IMPLEMENTATION.md
+pnpm-lock.yaml

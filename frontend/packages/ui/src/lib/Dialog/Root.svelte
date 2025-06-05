@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { createEventDispatcher, onMount } from "svelte";
+  import { createEventDispatcher, onMount, onDestroy } from "svelte";
   import { createDialog } from "./ctx.js";
   import type { Writable } from "svelte/store";
 
@@ -14,14 +14,29 @@
   export { open as isOpen };
 
   const dispatch = createEventDispatcher();
+  let unsubscribe: (() => void) | undefined;
+
   onMount(() => {
-    return open.subscribe((visible) => {
+    unsubscribe = open.subscribe((visible) => {
       if (visible) {
         dispatch("open");
       } else {
         dispatch("close");
       }
     });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  });
+
+  onDestroy(() => {
+    // Ensure cleanup happens even if component is destroyed before mount completes
+    if (unsubscribe) {
+      unsubscribe();
+    }
   });
 </script>
 

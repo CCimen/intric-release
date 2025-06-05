@@ -11,6 +11,12 @@
 
   export let data;
 
+  // Keep a stable reference to infoBlobs to prevent unnecessary re-renders
+  let stableInfoBlobs = data.infoBlobs;
+  $: if (data.infoBlobs !== stableInfoBlobs && JSON.stringify(data.infoBlobs) !== JSON.stringify(stableInfoBlobs)) {
+    stableInfoBlobs = data.infoBlobs;
+  }
+
   onMount(() => {
     const interval = setInterval(() => {
       invalidate("crawlruns:list");
@@ -64,7 +70,7 @@
       {#if data.environment.integrationRequestFormUrl}
         <CrawlLimitations></CrawlLimitations>
       {/if}
-      <BlobTable blobs={data.infoBlobs} canEdit={false}></BlobTable>
+      <BlobTable blobs={stableInfoBlobs} canEdit={false}></BlobTable>
     </Page.Tab>
   </Page.Main>
 </Page.Root>

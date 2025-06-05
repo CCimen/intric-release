@@ -12,10 +12,11 @@ export function createDialog(
   const ctx = createMeltDialog({
     open,
     portal,
-    forceVisible: true,
+    forceVisible: false,
     closeOnOutsideClick: true,
     escapeBehavior: "defer-otherwise-close",
-    role: isAlert ? "alertdialog" : "dialog"
+    role: isAlert ? "alertdialog" : "dialog",
+    preventScroll: true
   });
   setContext<typeof ctx>(ctxKey, ctx);
   return ctx;
