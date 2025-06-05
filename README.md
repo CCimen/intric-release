@@ -6,7 +6,7 @@
 
 **An open-source AI-powered knowledge management platform**
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Made for: Organizations](https://img.shields.io/badge/Made%20for-Organizations-orange)](https://github.com/inooLabs/intric-community)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](docs/contributing.md)
 
@@ -335,12 +335,12 @@ graph TB
 ## 👥 Community
 
 **Origin**: Developed by Sundsvall municipality, Sweden 🇸🇪
-**License**: Apache 2.0 for maximum flexibility
+**License**: AGPL-3.0 for open-source collaboration
 **Users**: Public sector, enterprises, research institutions, SMBs worldwide
 
 ## 📜 License
 
-Apache License 2.0 - Free for commercial and non-commercial use
+GNU Affero General Public License v3.0 - Ensures source code availability for network use
 
 ---
 
