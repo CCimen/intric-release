@@ -163,6 +163,7 @@ class Context(BaseModel):
 class ModelKwargs(BaseModel):
     temperature: Optional[float] = None
     top_p: Optional[float] = None
+    thinking_budget: Optional[int] = None
 
 
 class CompletionModelSparse(CompletionModelBase, InDB):

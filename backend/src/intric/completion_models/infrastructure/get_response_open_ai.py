@@ -42,6 +42,7 @@ async def get_response(
         try:
             reasoning_tokens = response.usage.completion_tokens_details.reasoning_tokens
         except AttributeError:
+            # Gemini and other providers might not have reasoning_tokens in the same structure
             reasoning_tokens = 0
 
         completion = Completion(
@@ -110,6 +111,8 @@ async def get_response_streaming(
                     logger.warning(
                         f"Attribution error while processing chunk: {attr_err}"
                     )
+                    # Gemini and other providers might not have reasoning_tokens in the same structure
+                    yield Completion(reasoning_token_count=0)
 
     except openai.BadRequestError as exc:
         raise BadRequestException("Invalid model kwargs") from exc

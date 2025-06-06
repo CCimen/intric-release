@@ -19,6 +19,7 @@ export type ModelBehaviour = keyof typeof behaviours;
 export type ModelKwArgs = {
   temperature?: number | null | undefined;
   top_p?: number | null | undefined;
+  thinking_budget?: number | null | undefined;
 };
 
 export const behaviourList = Object.keys(behaviours) as ModelBehaviour[];
@@ -32,13 +33,19 @@ export function getBehaviour(
     | {
         temperature?: number | null;
         top_p?: number | null;
+        thinking_budget?: number | null;
       }
     | undefined
     | null
 ): ModelBehaviour {
   for (const behaviour of behaviourList) {
     const behaviourKwargs = behaviours[behaviour];
-    if (JSON.stringify(behaviourKwargs) === JSON.stringify(kwargs)) {
+    // Only compare temperature and top_p for predefined behaviors
+    const compareKwargs = {
+      temperature: kwargs?.temperature,
+      top_p: kwargs?.top_p
+    };
+    if (JSON.stringify(behaviourKwargs) === JSON.stringify(compareKwargs)) {
       return behaviour;
     }
   }

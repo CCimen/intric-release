@@ -11,10 +11,58 @@
   import { IconCheck } from "@intric/icons/check";
   import { IconQuestionMark } from "@intric/icons/question-mark";
   import { Input, Tooltip } from "@intric/ui";
+  import type { CompletionModel } from "@intric/intric-js";
 
   export let kwArgs: ModelKwArgs;
   export let isDisabled: boolean;
+  export let selectedModel: CompletionModel | null = null;
   export let aria: AriaProps = { "aria-label": "Select model behaviour" };
+
+  // Thinking mode logic
+  $: showThinkingToggle = selectedModel?.reasoning ?? false;
+  $: isThinkingInteractive = selectedModel?.name === "gemini-2.5-flash-preview-05-20" || selectedModel?.name === "gemini-2.5-flash";
+  $: isThinkingAlwaysOn = selectedModel?.reasoning && !isThinkingInteractive;
+  
+  // For display purposes: get the effective thinking budget value
+  $: effectiveThinkingBudget = (() => {
+    if (!showThinkingToggle) return undefined;
+    
+    // If thinking_budget is already set, use that value
+    if (kwArgs.thinking_budget !== undefined && kwArgs.thinking_budget !== null) {
+      return kwArgs.thinking_budget;
+    }
+    
+    // For always-on models (2.5 Pro), show as enabled for display only
+    if (isThinkingAlwaysOn) {
+      return 1024; // Display value only - NOT set in kwArgs
+    }
+    
+    // For interactive models (2.5 Flash), show as disabled by default
+    return 0; // Show as disabled - NOT set in kwArgs
+  })();
+  
+  // DISABLE auto-initialization completely to prevent backend errors
+  // thinking_budget is only set when user explicitly interacts
+
+  // Convert thinking budget to boolean for RadioSwitch
+  $: thinkingEnabled = effectiveThinkingBudget !== undefined && effectiveThinkingBudget > 0;
+  
+  function handleThinkingToggle(enabled: boolean) {
+    // TEMPORARILY DISABLED: Only set thinking_budget when user explicitly interacts
+    // This prevents backend errors while thinking support is being implemented
+    
+    if (isThinkingInteractive) {
+      // For 2.5 Flash: user can enable/disable (when thinking support is restored)
+      // kwArgs.thinking_budget = enabled ? 512 : 0;
+      console.log("Thinking toggle clicked for 2.5 Flash:", enabled ? "enabled" : "disabled");
+    } else if (isThinkingAlwaysOn) {
+      // For 2.5 Pro: always enabled (when thinking support is restored)
+      // kwArgs.thinking_budget = 1024;
+      console.log("Thinking interaction for 2.5 Pro - always enabled");
+    }
+    
+    // TODO: Re-enable thinking_budget setting once backend support is fixed
+  }
 
   const {
     elements: { trigger, menu, option },
@@ -33,9 +81,11 @@
       // If the user selects "custom", we want to keep the current kwargs settings if they already are custom
       // However, if they are not, then we initialise with a default custom setting
       const customArgs =
-        getBehaviour(kwArgs) === "custom" ? kwArgs : { temperature: 1, top_p: null };
+        getBehaviour(kwArgs) === "custom" ? kwArgs : { temperature: 1, top_p: null, thinking_budget: kwArgs.thinking_budget };
+      // Preserve thinking_budget when changing behaviors
+      const newArgs = args ? { ...args, thinking_budget: kwArgs.thinking_budget } : customArgs;
       // keep in mind: setting the kwargs will trigger the `watchKwArgs` function
-      kwArgs = args ? args : customArgs;
+      kwArgs = newArgs;
       return next;
     }
   });
@@ -45,7 +95,11 @@
   // This can't be a declarative statement with $: as it would fire in too many situations
   let customTemp: number = 1;
   function maybeSetKwArgsCustom() {
-    const args = { temperature: customTemp, top_p: null };
+    const args = { 
+      temperature: customTemp, 
+      top_p: null,
+      thinking_budget: kwArgs.thinking_budget // Preserve thinking_budget
+    };
     if (getBehaviour(args) === "custom") {
       kwArgs = args;
     }
@@ -141,6 +195,24 @@
       min={0}
       hiddenLabel={true}
     ></Input.Number>
+  </div>
+{/if}
+
+{#if showThinkingToggle}
+  <div
+    class="border-default hover:bg-hover-stronger flex h-[4.125rem] items-center justify-between gap-8 border-b px-4 opacity-60"
+  >
+    <div class="flex items-center gap-2">
+      <p class="w-24" aria-label="Thinking setting" id="thinking_label">Thinking</p>
+      <Tooltip
+        text="Thinking mode is temporarily disabled while we implement proper support for Gemini's reasoning capabilities. The model will still work normally."
+      >
+        <IconQuestionMark class="text-muted hover:text-primary" />
+      </Tooltip>
+    </div>
+    <div class="flex items-center gap-4">
+      <span class="text-muted text-sm">Temporarily disabled</span>
+    </div>
   </div>
 {/if}
 
