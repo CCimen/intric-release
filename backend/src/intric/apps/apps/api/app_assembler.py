@@ -114,7 +114,7 @@ class AppAssembler:
             limit=Limit(max_files=3, max_size=26214400),
         )
 
-        transcription_model = TranscriptionModelPublic.from_domain(app.transcription_model)
+        transcription_model = TranscriptionModelPublic.from_domain(app.transcription_model) if app.transcription_model else None
 
         return AppPublic(
             created_at=app.created_at,
