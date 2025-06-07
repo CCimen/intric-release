@@ -47,21 +47,46 @@
   // Convert thinking budget to boolean for RadioSwitch
   $: thinkingEnabled = effectiveThinkingBudget !== undefined && effectiveThinkingBudget > 0;
   
-  function handleThinkingToggle(enabled: boolean) {
-    // TEMPORARILY DISABLED: Only set thinking_budget when user explicitly interacts
-    // This prevents backend errors while thinking support is being implemented
-    
-    if (isThinkingInteractive) {
-      // For 2.5 Flash: user can enable/disable (when thinking support is restored)
-      // kwArgs.thinking_budget = enabled ? 512 : 0;
-      console.log("Thinking toggle clicked for 2.5 Flash:", enabled ? "enabled" : "disabled");
-    } else if (isThinkingAlwaysOn) {
-      // For 2.5 Pro: always enabled (when thinking support is restored)
-      // kwArgs.thinking_budget = 1024;
-      console.log("Thinking interaction for 2.5 Pro - always enabled");
+  function validateThinkingBudget(value: number): number {
+    // Validate thinking_budget values are within acceptable ranges
+    const validValues = [0, 512, 1024];
+    if (validValues.includes(value)) {
+      return value;
     }
-    
-    // TODO: Re-enable thinking_budget setting once backend support is fixed
+    // Fallback to closest valid value
+    if (value < 256) return 0;
+    if (value < 768) return 512;
+    return 1024;
+  }
+
+  function handleThinkingToggle(enabled: boolean) {
+    if (isThinkingInteractive) {
+      // For 2.5 Flash: user can enable/disable thinking
+      const newValue = validateThinkingBudget(enabled ? 512 : 0);
+      kwArgs.thinking_budget = newValue;
+      console.log("Thinking toggle for 2.5 Flash:", enabled ? "enabled (512)" : "disabled (0)");
+    } else if (isThinkingAlwaysOn) {
+      // For 2.5 Pro: always enabled, cannot be changed
+      const newValue = validateThinkingBudget(1024);
+      kwArgs.thinking_budget = newValue;
+      console.log("Thinking for 2.5 Pro - always enabled (1024)");
+    }
+  }
+
+  function handleThinkingToggleSwitch({ current, next }: { current: boolean; next: boolean }) {
+    if (current !== next) {
+      handleThinkingToggle(next);
+    }
+  }
+
+  function getThinkingTooltipText(): string {
+    if (isThinkingInteractive) {
+      return "Enable thinking mode to let the model reason through complex problems step by step. This can improve answer quality for complex questions but may increase response time.";
+    } else if (isThinkingAlwaysOn) {
+      return "This model has reasoning capabilities that are always enabled. The model will automatically think through complex problems before responding.";
+    } else {
+      return "Enable thinking mode to let the model reason through complex problems step by step before providing an answer.";
+    }
   }
 
   const {
@@ -200,18 +225,33 @@
 
 {#if showThinkingToggle}
   <div
-    class="border-default hover:bg-hover-stronger flex h-[4.125rem] items-center justify-between gap-8 border-b px-4 opacity-60"
+    class="border-default hover:bg-hover-stronger flex h-[4.125rem] items-center justify-between gap-8 border-b px-4"
   >
     <div class="flex items-center gap-2">
       <p class="w-24" aria-label="Thinking setting" id="thinking_label">Thinking</p>
       <Tooltip
-        text="Thinking mode is temporarily disabled while we implement proper support for Gemini's reasoning capabilities. The model will still work normally."
+        text={getThinkingTooltipText()}
       >
         <IconQuestionMark class="text-muted hover:text-primary" />
       </Tooltip>
     </div>
     <div class="flex items-center gap-4">
-      <span class="text-muted text-sm">Temporarily disabled</span>
+      {#if isThinkingInteractive}
+        <Input.RadioSwitch
+          bind:value={thinkingEnabled}
+          labelTrue="On"
+          labelFalse="Off"
+          disabled={false}
+          sideEffect={handleThinkingToggleSwitch}
+        />
+      {:else if isThinkingAlwaysOn}
+        <Input.RadioSwitch
+          value={true}
+          labelTrue="Always On"
+          labelFalse="Off"
+          disabled={true}
+        />
+      {/if}
     </div>
   </div>
 {/if}
