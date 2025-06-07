@@ -41,7 +41,7 @@ def test_gemini_adapter_inherits_query_creation():
 
 
 def test_gemini_adapter_thinking_kwargs_for_flash_model():
-    """Test that thinking_budget is set correctly for Gemini 2.5 Flash models."""
+    """Test that reasoning parameters work correctly for Gemini 2.5 Flash models."""
     with patch("intric.main.config.SETTINGS") as mock_settings:
         mock_settings.gemini_api_key = "test-api-key"
         
@@ -49,16 +49,17 @@ def test_gemini_adapter_thinking_kwargs_for_flash_model():
         
         # Test with no model_kwargs provided
         kwargs = adapter._get_kwargs(None)
-        assert kwargs == {"thinking_budget": 512}  # Default for 2.5 Flash
+        assert kwargs == {}  # No reasoning parameters by default
         
-        # Test with custom thinking_budget
+        # Test with custom thinking_budget (legacy)
         model_kwargs = ModelKwargs(thinking_budget=1024)
         kwargs = adapter._get_kwargs(model_kwargs)
-        assert kwargs["thinking_budget"] == 1024
+        assert kwargs.get("reasoning_effort") == "medium"  # 1024 maps to medium
+        assert "thinking_budget" not in kwargs  # Internal param filtered out
 
 
 def test_gemini_adapter_thinking_kwargs_for_pro_model():
-    """Test that thinking_budget is set correctly for Gemini 2.5 Pro models."""
+    """Test that reasoning parameters work correctly for Gemini 2.5 Pro models."""
     # Create a Pro model for testing
     pro_model = TEST_MODEL_GEMINI_FLASH.model_copy()
     pro_model.name = "gemini-2.5-pro"
@@ -70,7 +71,7 @@ def test_gemini_adapter_thinking_kwargs_for_pro_model():
         
         # Test with no model_kwargs provided
         kwargs = adapter._get_kwargs(None)
-        assert kwargs == {"thinking_budget": 1024}  # Default for 2.5 Pro
+        assert kwargs == {}  # No reasoning parameters by default
 
 
 def test_gemini_adapter_no_thinking_for_non_reasoning_model():
@@ -128,7 +129,7 @@ def test_gemini_adapter_with_conversation_history():
 
 
 def test_gemini_adapter_custom_kwargs_override():
-    """Test that custom model kwargs properly override defaults."""
+    """Test that custom model kwargs are handled correctly."""
     with patch("intric.main.config.SETTINGS") as mock_settings:
         mock_settings.gemini_api_key = "test-api-key"
         
@@ -144,9 +145,63 @@ def test_gemini_adapter_custom_kwargs_override():
         kwargs = adapter._get_kwargs(model_kwargs)
         
         expected_kwargs = {
-            "thinking_budget": 0,
             "temperature": 0.7,
             "max_tokens": 1000
         }
         
         assert kwargs == expected_kwargs
+
+
+def test_parameter_filtering_removes_internal_params():
+    """Ensure internal params don't leak to API - CRITICAL for stability."""
+    with patch("intric.main.config.SETTINGS") as mock_settings:
+        mock_settings.gemini_api_key = "test-api-key"
+        
+        adapter = GeminiModelAdapter(TEST_MODEL_GEMINI_FLASH)
+        model_kwargs = ModelKwargs(
+            reasoning_level="medium",
+            thinking_budget=1024,
+            temperature=0.7
+        )
+        kwargs = adapter._get_kwargs(model_kwargs)
+        
+        # These should be filtered out
+        assert "reasoning_level" not in kwargs
+        assert "thinking_budget" not in kwargs
+        # This should remain
+        assert kwargs["temperature"] == 0.7
+        # Reasoning effort should be added for reasoning-capable models
+        assert kwargs.get("reasoning_effort") == "medium"
+
+
+def test_reasoning_effort_mapping_edge_cases():
+    """Test edge cases that could break in production."""
+    with patch("intric.main.config.SETTINGS") as mock_settings:
+        mock_settings.gemini_api_key = "test-api-key"
+        
+        adapter = GeminiModelAdapter(TEST_MODEL_GEMINI_FLASH)
+        
+        # Test with None/empty kwargs
+        assert adapter._map_reasoning_level_to_effort(ModelKwargs()) == "none"
+        
+        # Test priority: reasoning_level over thinking_budget
+        kwargs = ModelKwargs(reasoning_level="low", thinking_budget=2048)
+        assert adapter._map_reasoning_level_to_effort(kwargs) == "low"
+        
+        # Test invalid reasoning_level defaults to "none"
+        kwargs = ModelKwargs(reasoning_level="invalid")
+        assert adapter._map_reasoning_level_to_effort(kwargs) == "none"
+
+
+def test_non_reasoning_model_filtering():
+    """Ensure non-reasoning models don't get reasoning params."""
+    with patch("intric.main.config.SETTINGS") as mock_settings:
+        mock_settings.gemini_api_key = "test-api-key"
+        
+        # Create a non-reasoning model (like 2.0 Flash)
+        non_reasoning_model = TEST_MODEL_GEMINI_FLASH.model_copy()
+        non_reasoning_model.name = "gemini-2.0-flash"
+        adapter = GeminiModelAdapter(non_reasoning_model)
+        
+        kwargs = adapter._get_kwargs(ModelKwargs(reasoning_level="high"))
+        assert "reasoning_effort" not in kwargs
