@@ -437,14 +437,16 @@ class Space:
     def can_run_app(self, app: "App") -> bool:
         if not self.is_completion_model_available(app.completion_model.id):
             return False
-        if not self.is_transcription_model_available(app.transcription_model.id):
+        # Only check transcription model availability if the app has one
+        if app.transcription_model and not self.is_transcription_model_available(app.transcription_model.id):
             return False
         if self.security_classification is not None:
             if self.security_classification.is_greater_than(
                 app.completion_model.security_classification
             ):
                 return False
-            if self.security_classification.is_greater_than(
+            # Only check transcription model security if the app has one
+            if app.transcription_model and self.security_classification.is_greater_than(
                 app.transcription_model.security_classification
             ):
                 return False
