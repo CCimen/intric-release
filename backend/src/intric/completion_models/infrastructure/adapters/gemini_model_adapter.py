@@ -51,24 +51,112 @@ class GeminiModelAdapter(OpenAIModelAdapter):
         
         return model_name_mapping.get(self.model.name, self.model.name)
     
+    def _model_supports_reasoning(self) -> bool:
+        """
+        Check if the current Gemini model supports reasoning/thinking parameters.
+        
+        Based on Google's Gemini API documentation:
+        - gemini-2.0-flash: No reasoning support
+        - gemini-2.5-flash-*: Optional reasoning support  
+        - gemini-2.5-pro-*: Reasoning support (always-on for Pro)
+        
+        Returns:
+            bool: True if model supports reasoning_effort parameter
+        """
+        model_name = self._get_correct_model_name()
+        
+        # Models that do NOT support reasoning
+        non_reasoning_models = [
+            "gemini-2.0-flash"
+        ]
+        
+        # Models that DO support reasoning
+        reasoning_models = [
+            "gemini-2.5-flash-preview-05-20",
+            "gemini-2.5-pro-preview-06-05"
+        ]
+        
+        if model_name in non_reasoning_models:
+            return False
+        elif model_name in reasoning_models:
+            return True
+        else:
+            # Default: assume reasoning support for newer/unknown models
+            # Log a warning for unknown models
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Unknown Gemini model '{model_name}' - assuming reasoning support. Please update model capability list.")
+            return True
+    
     def _get_kwargs(self, kwargs: ModelKwargs | None):
         """
-        Override to handle Gemini-specific parameters.
+        Override to handle Gemini-specific parameters with reasoning_effort support.
         
-        Fallback approach: Remove all thinking parameters for now to restore basic functionality.
-        This ensures Gemini models work without thinking-related errors.
+        Maps reasoning_level to Google's reasoning_effort parameter.
+        Maintains backward compatibility with thinking_budget.
+        Only adds reasoning parameters for models that support them.
         """
         base_kwargs = super()._get_kwargs(kwargs)
         
-        # TEMPORARILY DISABLE thinking support to restore basic functionality
-        # Remove thinking_budget entirely to prevent OpenAI client errors
-        base_kwargs.pop("thinking_budget", None)
+        # Remove Intric-specific parameters not supported by Gemini/OpenAI API
+        # These are our internal abstractions that need to be mapped to API-specific params
+        base_kwargs.pop("thinking_budget", None)   # Legacy parameter
+        base_kwargs.pop("reasoning_level", None)   # Unified abstraction
         
-        # TODO: Re-implement thinking support once basic functionality is confirmed
-        # The approach will likely need to use Gemini's native API or 
-        # wait for OpenAI client library updates
+        # Get model information for logging and capability checking
+        model_name = self._get_correct_model_name()
+        supports_reasoning = self._model_supports_reasoning()
         
+        # Enhanced logging for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Gemini Model: {model_name}, supports_reasoning: {supports_reasoning}")
+        
+        # Only add reasoning_effort for models that support reasoning capabilities
+        if kwargs and supports_reasoning:
+            reasoning_effort = self._map_reasoning_level_to_effort(kwargs)
+            if reasoning_effort and reasoning_effort != "none":
+                base_kwargs["reasoning_effort"] = reasoning_effort
+                logger.info(f"Gemini API: Added reasoning_effort={reasoning_effort}")
+            else:
+                logger.info(f"Gemini API: No reasoning_effort (disabled or none)")
+        elif kwargs:
+            # Log when reasoning is requested but not supported
+            reasoning_effort = self._map_reasoning_level_to_effort(kwargs)
+            if reasoning_effort and reasoning_effort != "none":
+                logger.warning(f"Gemini API: Model {model_name} does not support reasoning, ignoring reasoning_effort={reasoning_effort}")
+        
+        logger.info(f"Gemini API: Final parameters: {list(base_kwargs.keys())}")
         return base_kwargs
+    
+    def _map_reasoning_level_to_effort(self, kwargs: ModelKwargs) -> str:
+        """
+        Map reasoning_level or thinking_budget to Google's reasoning_effort parameter.
+        
+        Priority:
+        1. reasoning_level (new unified approach)
+        2. thinking_budget (legacy fallback)
+        3. "none" (default - disabled)
+        """
+        # Use reasoning_level if provided
+        if kwargs.reasoning_level:
+            if kwargs.reasoning_level == "disabled":
+                return "none"
+            return kwargs.reasoning_level  # Direct mapping for "low", "medium", "high"
+        
+        # Fallback to thinking_budget conversion for backward compatibility
+        if kwargs.thinking_budget is not None:
+            if kwargs.thinking_budget == 0:
+                return "none"
+            elif kwargs.thinking_budget <= 512:
+                return "low"
+            elif kwargs.thinking_budget <= 1024:
+                return "medium"
+            else:
+                return "high"
+        
+        # Default: disabled
+        return "none"
     
     async def get_response(
         self,

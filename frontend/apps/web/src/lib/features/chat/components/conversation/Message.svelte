@@ -74,12 +74,21 @@
 
     const modelName = chat.partner.completion_model.name;
     
-    // Gemini 2.5 Flash models: Check if user has enabled thinking
+    // Gemini 2.5 Flash models: Check if user has enabled reasoning
     if (modelName === "gemini-2.5-flash" || modelName === "gemini-2.5-flash-preview-05-20") {
-      const thinkingBudget = 
-        "completion_model_kwargs" in chat.partner ? 
-        (chat.partner.completion_model_kwargs?.thinking_budget ?? 0) : 0;
-      return thinkingBudget > 0;
+      if ("completion_model_kwargs" in chat.partner) {
+        const kwargs = chat.partner.completion_model_kwargs;
+        
+        // Check reasoning_level first (new system)
+        if (kwargs?.reasoning_level !== undefined && kwargs?.reasoning_level !== null) {
+          return kwargs.reasoning_level !== "disabled";
+        }
+        
+        // Fallback to thinking_budget (legacy system)
+        const thinkingBudget = kwargs?.thinking_budget ?? 0;
+        return thinkingBudget > 0;
+      }
+      return false;
     }
     
     // Always-on reasoning models (Claude, Gemini 2.5 Pro, etc.): Show if model supports reasoning

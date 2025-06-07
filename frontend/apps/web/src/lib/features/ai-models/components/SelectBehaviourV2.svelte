@@ -3,9 +3,13 @@
     behaviourList,
     getBehaviour,
     getKwargs,
+    getEffectiveReasoningLevel,
+    convertReasoningLevelToThinkingBudget,
     type ModelBehaviour,
-    type ModelKwArgs
+    type ModelKwArgs,
+    type ReasoningLevel
   } from "../ModelBehaviours";
+  import ReasoningLevelSelector from "./ReasoningLevelSelector.svelte";
   import { createSelect } from "@melt-ui/svelte";
   import { IconChevronDown } from "@intric/icons/chevron-down";
   import { IconCheck } from "@intric/icons/check";
@@ -18,76 +22,19 @@
   export let selectedModel: CompletionModel | null = null;
   export let aria: AriaProps = { "aria-label": "Select model behaviour" };
 
-  // Thinking mode logic
+  // Reasoning level logic (unified approach)
   $: showThinkingToggle = selectedModel?.reasoning ?? false;
-  $: isThinkingInteractive = selectedModel?.name === "gemini-2.5-flash-preview-05-20" || selectedModel?.name === "gemini-2.5-flash";
-  $: isThinkingAlwaysOn = selectedModel?.reasoning && !isThinkingInteractive;
   
-  // For display purposes: get the effective thinking budget value
-  $: effectiveThinkingBudget = (() => {
-    if (!showThinkingToggle) return undefined;
-    
-    // If thinking_budget is already set, use that value
-    if (kwArgs.thinking_budget !== undefined && kwArgs.thinking_budget !== null) {
-      return kwArgs.thinking_budget;
-    }
-    
-    // For always-on models (2.5 Pro), show as enabled for display only
-    if (isThinkingAlwaysOn) {
-      return 1024; // Display value only - NOT set in kwArgs
-    }
-    
-    // For interactive models (2.5 Flash), show as disabled by default
-    return 0; // Show as disabled - NOT set in kwArgs
-  })();
+  // Get current reasoning level from kwArgs (prioritizing reasoning_level over thinking_budget)
+  $: reasoningLevel = getEffectiveReasoningLevel(kwArgs);
   
-  // DISABLE auto-initialization completely to prevent backend errors
-  // thinking_budget is only set when user explicitly interacts
-
-  // Convert thinking budget to boolean for RadioSwitch
-  $: thinkingEnabled = effectiveThinkingBudget !== undefined && effectiveThinkingBudget > 0;
+  // Sync reasoning level changes back to kwArgs
+  $: if (reasoningLevel !== undefined) {
+    // Update both parameters for compatibility during transition
+    kwArgs.reasoning_level = reasoningLevel;
+    kwArgs.thinking_budget = convertReasoningLevelToThinkingBudget(reasoningLevel);
+  }
   
-  function validateThinkingBudget(value: number): number {
-    // Validate thinking_budget values are within acceptable ranges
-    const validValues = [0, 512, 1024];
-    if (validValues.includes(value)) {
-      return value;
-    }
-    // Fallback to closest valid value
-    if (value < 256) return 0;
-    if (value < 768) return 512;
-    return 1024;
-  }
-
-  function handleThinkingToggle(enabled: boolean) {
-    if (isThinkingInteractive) {
-      // For 2.5 Flash: user can enable/disable thinking
-      const newValue = validateThinkingBudget(enabled ? 512 : 0);
-      kwArgs.thinking_budget = newValue;
-      console.log("Thinking toggle for 2.5 Flash:", enabled ? "enabled (512)" : "disabled (0)");
-    } else if (isThinkingAlwaysOn) {
-      // For 2.5 Pro: always enabled, cannot be changed
-      const newValue = validateThinkingBudget(1024);
-      kwArgs.thinking_budget = newValue;
-      console.log("Thinking for 2.5 Pro - always enabled (1024)");
-    }
-  }
-
-  function handleThinkingToggleSwitch({ current, next }: { current: boolean; next: boolean }) {
-    if (current !== next) {
-      handleThinkingToggle(next);
-    }
-  }
-
-  function getThinkingTooltipText(): string {
-    if (isThinkingInteractive) {
-      return "Enable thinking mode to let the model reason through complex problems step by step. This can improve answer quality for complex questions but may increase response time.";
-    } else if (isThinkingAlwaysOn) {
-      return "This model has reasoning capabilities that are always enabled. The model will automatically think through complex problems before responding.";
-    } else {
-      return "Enable thinking mode to let the model reason through complex problems step by step before providing an answer.";
-    }
-  }
 
   const {
     elements: { trigger, menu, option },
@@ -106,9 +53,18 @@
       // If the user selects "custom", we want to keep the current kwargs settings if they already are custom
       // However, if they are not, then we initialise with a default custom setting
       const customArgs =
-        getBehaviour(kwArgs) === "custom" ? kwArgs : { temperature: 1, top_p: null, thinking_budget: kwArgs.thinking_budget };
-      // Preserve thinking_budget when changing behaviors
-      const newArgs = args ? { ...args, thinking_budget: kwArgs.thinking_budget } : customArgs;
+        getBehaviour(kwArgs) === "custom" ? kwArgs : { 
+          temperature: 1, 
+          top_p: null, 
+          thinking_budget: kwArgs.thinking_budget,
+          reasoning_level: kwArgs.reasoning_level
+        };
+      // Preserve reasoning parameters when changing behaviors
+      const newArgs = args ? { 
+        ...args, 
+        thinking_budget: kwArgs.thinking_budget,
+        reasoning_level: kwArgs.reasoning_level
+      } : customArgs;
       // keep in mind: setting the kwargs will trigger the `watchKwArgs` function
       kwArgs = newArgs;
       return next;
@@ -123,7 +79,8 @@
     const args = { 
       temperature: customTemp, 
       top_p: null,
-      thinking_budget: kwArgs.thinking_budget // Preserve thinking_budget
+      thinking_budget: kwArgs.thinking_budget, // Preserve thinking_budget
+      reasoning_level: kwArgs.reasoning_level  // Preserve reasoning_level
     };
     if (getBehaviour(args) === "custom") {
       kwArgs = args;
@@ -227,32 +184,11 @@
   <div
     class="border-default hover:bg-hover-stronger flex h-[4.125rem] items-center justify-between gap-8 border-b px-4"
   >
-    <div class="flex items-center gap-2">
-      <p class="w-24" aria-label="Thinking setting" id="thinking_label">Thinking</p>
-      <Tooltip
-        text={getThinkingTooltipText()}
-      >
-        <IconQuestionMark class="text-muted hover:text-primary" />
-      </Tooltip>
-    </div>
-    <div class="flex items-center gap-4">
-      {#if isThinkingInteractive}
-        <Input.RadioSwitch
-          bind:value={thinkingEnabled}
-          labelTrue="On"
-          labelFalse="Off"
-          disabled={false}
-          sideEffect={handleThinkingToggleSwitch}
-        />
-      {:else if isThinkingAlwaysOn}
-        <Input.RadioSwitch
-          value={true}
-          labelTrue="Always On"
-          labelFalse="Off"
-          disabled={true}
-        />
-      {/if}
-    </div>
+    <ReasoningLevelSelector
+      bind:value={reasoningLevel}
+      model={selectedModel}
+      disabled={isDisabled}
+    />
   </div>
 {/if}
 
