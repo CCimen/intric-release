@@ -47,7 +47,6 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:intric-test
             ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ github.ref_name }}
           labels: ${{ steps.meta-backend.outputs.labels }}
           
@@ -66,6 +65,5 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:intric-test
             ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ github.ref_name }}
           labels: ${{ steps.meta-frontend.outputs.labels }} 

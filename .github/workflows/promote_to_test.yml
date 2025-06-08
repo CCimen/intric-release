@@ -1,0 +1,62 @@
+name: Promote to Test Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: 'Branch to promote to test environment'
+        required: true
+        default: 'admin-usertoken-usage'
+        type: choice
+        options:
+          - admin-usertoken-usage
+          - feature/basic-auth-and-more-updates
+          - main
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE_NAME: ccimen/intric-release-backend
+  FRONTEND_IMAGE_NAME: ccimen/intric-release-frontend
+
+jobs:
+  promote-to-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote backend image to test
+        run: |
+          # Pull the source branch image
+          docker pull ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ github.event.inputs.source_branch }}
+          
+          # Tag as intric-test
+          docker tag ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ github.event.inputs.source_branch }} ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:intric-test
+          
+          # Push to test environment
+          docker push ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:intric-test
+
+      - name: Promote frontend image to test
+        run: |
+          # Pull the source branch image
+          docker pull ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ github.event.inputs.source_branch }}
+          
+          # Tag as intric-test
+          docker tag ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ github.event.inputs.source_branch }} ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:intric-test
+          
+          # Push to test environment
+          docker push ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:intric-test
+
+      - name: Summary
+        run: |
+          echo "✅ Successfully promoted ${{ github.event.inputs.source_branch }} to test environment"
+          echo "🐳 Backend: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:intric-test"
+          echo "🐳 Frontend: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:intric-test"
+          echo "🚀 Your server can now pull and deploy the intric-test images"
